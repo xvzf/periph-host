@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"periph.io/x/conn/v3/physic"
+	"periph.io/x/host/v3/distro"
 )
 
 // errClockRegister is returned in a situation where the clock memory is not
@@ -19,8 +20,21 @@ var errClockRegister = errors.New("can't write to clock divisor CPU register")
 
 // Clock sources frequency in hertz.
 const (
-	clk19dot2MHz = 19200 * physic.KiloHertz
+	clk19dot2MHz = 19200 * physic.KiloHertz // oscillator frequency until RPi4
+	clk54MHz     = 54 * physic.MegaHertz    // starting with bmc2711, the oscillator is 54MHz
 	clk500MHz    = 500 * physic.MegaHertz
+)
+
+func init() {
+	// The oscillator frequency is 54MHz on RPi4 (and beyond?).
+	compat := strings.Join(distro.DTCompatible(), " ")
+	if strings.Contains(compat, "bcm2711") {
+		oscillatorFrequency = clk54MHz
+	}
+}
+
+var (
+	oscillatorFrequency physic.Frequency = clk19dot2MHz
 )
 
 const (
@@ -39,7 +53,7 @@ const (
 	clockEnable        clockCtl = 1 << 4   // ENAB
 	clockSrcMask       clockCtl = 0xF << 0 // SRC
 	clockSrcGND        clockCtl = 0        // 0Hz
-	clockSrc19dot2MHz  clockCtl = 1        // 19.2MHz
+	clockSrcOscillator clockCtl = 1        // 19.2MHz until RPi4, 54MHz starting with RPi4
 	clockSrcTestDebug0 clockCtl = 2        // 0Hz
 	clockSrcTestDebug1 clockCtl = 3        // 0Hz
 	clockSrcPLLA       clockCtl = 4        // 0Hz
@@ -91,8 +105,8 @@ func (c clockCtl) String() string {
 	switch x := c & clockSrcMask; x {
 	case clockSrcGND:
 		out = append(out, "GND(0Hz)")
-	case clockSrc19dot2MHz:
-		out = append(out, "19.2MHz")
+	case clockSrcOscillator:
+		out = append(out, "19.2Mhz (54Mhz on RPi4)")
 	case clockSrcTestDebug0:
 		out = append(out, "Debug0(0Hz)")
 	case clockSrcTestDebug1:
@@ -145,7 +159,7 @@ func (c clockDiv) String() string {
 
 // clock is a pair of clockCtl / clockDiv.
 //
-// It can be set to one of the sources: clockSrc19dot2MHz(19.2MHz) and
+// It can be set to one of the sources: clockSrcOscillator(19.2MHz/54Mhz) and
 // clockSrcPLLD(500Mhz), then divided to a value to get the resulting clock.
 // Per spec the resulting frequency should be under 25Mhz.
 type clock struct {
@@ -222,11 +236,11 @@ func calcSource(f physic.Frequency, maxWaitCycles uint32) (clockCtl, uint32, uin
 	if f > 125*physic.MegaHertz {
 		return 0, 0, 0, 0, fmt.Errorf("bcm283x-clock: desired frequency %s is too high", f)
 	}
-	// http://elinux.org/BCM2835_datasheet_errata states that clockSrc19dot2MHz
+	// http://elinux.org/BCM2835_datasheet_errata states that clockSrcOscillator
 	// is the cleanest clock source so try it first.
-	div, wait := findDivisorExact(clk19dot2MHz, f, maxWaitCycles)
+	div, wait := findDivisorExact(oscillatorFrequency, f, maxWaitCycles)
 	if div != 0 {
-		return clockSrc19dot2MHz, div, wait, f, nil
+		return clockSrcOscillator, div, wait, f, nil
 	}
 	// Try 500Mhz.
 	div, wait = findDivisorExact(clk500MHz, f, maxWaitCycles)
@@ -237,10 +251,10 @@ func calcSource(f physic.Frequency, maxWaitCycles uint32) (clockCtl, uint32, uin
 	// Try with up to 10x oversampling. This is generally useful for lower
 	// frequencies, below 10kHz. Prefer the one with less oversampling. Only for
 	// non-aliased matches.
-	div19, wait19, f19 := findDivisorOversampled(clk19dot2MHz, f, maxWaitCycles)
+	div19, wait19, f19 := findDivisorOversampled(oscillatorFrequency, f, maxWaitCycles)
 	div500, wait500, f500 := findDivisorOversampled(clk500MHz, f, maxWaitCycles)
 	if div19 != 0 && (div500 == 0 || f19 < f500) {
-		return clockSrc19dot2MHz, div19, wait19, f19, nil
+		return clockSrcOscillator, div19, wait19, f19, nil
 	}
 	if div500 != 0 {
 		return clockSrcPLLD, div500, wait500, f500, nil
@@ -277,7 +291,7 @@ func (c *clock) setRaw(ctl clockCtl, div uint32) error {
 	if div < 1 || div > clockDiviMax {
 		return errors.New("invalid clock divisor")
 	}
-	if ctl != clockSrc19dot2MHz && ctl != clockSrcPLLD {
+	if ctl != clockSrcOscillator && ctl != clockSrcPLLD {
 		return errors.New("invalid clock control")
 	}
 	// Stop the clock.

@@ -54,11 +54,11 @@ func TestClock(t *testing.T) {
 	if _, _, err := c.set(25000001*physic.Hertz, dmaWaitcyclesMax+1); err == nil {
 		t.Fatal("freq too high")
 	}
-	if s := c.String(); s != "PWD|Enable|19.2MHz / 4000.(1509949440/4095)" {
+	if s := c.String(); s != "PWD|Enable|19.2Mhz (54Mhz on RPi4) / 4000.(1509949440/4095)" {
 		t.Fatal(s)
 	}
 
-	if c.setRaw(clockSrc19dot2MHz, 0) == nil {
+	if c.setRaw(clockSrcOscillator, 0) == nil {
 		t.Fatal("invalid div")
 	}
 	if c.setRaw(0, 1) == nil {
@@ -82,7 +82,7 @@ func TestClockCtl_String(t *testing.T) {
 	}{
 		{^clockCtl(0), "Mash3|Flip|Busy|Kill|Enable|GND(15)|clockCtl(0xfffff840)"},
 		{clockPasswdCtl, "PWD|GND(0Hz)"},
-		{clockMash1 | clockSrc19dot2MHz, "Mash1|19.2MHz"},
+		{clockMash1 | clockSrcOscillator, "Mash1|19.2Mhz (54Mhz on RPi4)"},
 		{clockMash2 | clockSrcTestDebug0, "Mash2|Debug0(0Hz)"},
 		{clockSrcTestDebug1, "Debug1(0Hz)"},
 		{clockSrcPLLA, "PLLA(0Hz)"},
@@ -113,62 +113,62 @@ func TestCalcSource_exact(t *testing.T) {
 			// Lowest clean exact clock.
 			150 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 4000, 32,
+			clockSrcOscillator, 4000, 32,
 		},
 		{
 			200 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 4000, 24,
+			clockSrcOscillator, 4000, 24,
 		},
 		{
 			250 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3840, 20,
+			clockSrcOscillator, 3840, 20,
 		},
 		{
 			300 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 4000, 16,
+			clockSrcOscillator, 4000, 16,
 		},
 		{
 			1500 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3200, 4,
+			clockSrcOscillator, 3200, 4,
 		},
 		{
 			1000 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3840, 5,
+			clockSrcOscillator, 3840, 5,
 		},
 		{
 			2000 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3200, 3,
+			clockSrcOscillator, 3200, 3,
 		},
 		{
 			2500 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3840, 2,
+			clockSrcOscillator, 3840, 2,
 		},
 		{
 			3 * physic.KiloHertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 3200, 2,
+			clockSrcOscillator, 3200, 2,
 		},
 		{
 			10 * physic.KiloHertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 1920, 1,
+			clockSrcOscillator, 1920, 1,
 		},
 		{
 			100 * physic.KiloHertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 192, 1,
+			clockSrcOscillator, 192, 1,
 		},
 		{
 			120 * physic.KiloHertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz, 160, 1,
+			clockSrcOscillator, 160, 1,
 		},
 		{
 			125 * physic.KiloHertz,
@@ -224,7 +224,7 @@ func TestCalcSource_oversample(t *testing.T) {
 			// 150x
 			1 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz,
+			clockSrcOscillator,
 			4000, 32,
 			150 * physic.Hertz,
 		},
@@ -232,7 +232,7 @@ func TestCalcSource_oversample(t *testing.T) {
 			// 75x
 			2 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz,
+			clockSrcOscillator,
 			4000, 32,
 			150 * physic.Hertz,
 		},
@@ -240,7 +240,7 @@ func TestCalcSource_oversample(t *testing.T) {
 			// 15x
 			10 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz,
+			clockSrcOscillator,
 			4000, 32,
 			150 * physic.Hertz,
 		},
@@ -248,7 +248,7 @@ func TestCalcSource_oversample(t *testing.T) {
 			// 2x
 			100 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			clockSrc19dot2MHz,
+			clockSrcOscillator,
 			4000, 24,
 			200 * physic.Hertz,
 		},
@@ -282,7 +282,7 @@ func TestCalcSource_inexact(t *testing.T) {
 			// 2930/1465 = 2x
 			clk19dot2MHz / clockDiviMax / (dmaWaitcyclesMax + 1) * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			//clockSrc19dot2MHz, 2121, 31, 292,
+			//clockSrcOscillator, 2121, 31, 292,
 		},
 		{
 			// 93795/46886 = 2.0004 (error: 0.025%)
@@ -294,7 +294,7 @@ func TestCalcSource_inexact(t *testing.T) {
 			// 1465.2014/7 = 209.31x (error: 0.15%)
 			7 * physic.Hertz,
 			dmaWaitcyclesMax + 1,
-			//clockSrc19dot2MHz, 4095, 32, 146, // 146.52014
+			//clockSrcOscillator, 4095, 32, 146, // 146.52014
 		},
 	}
 	for i, line := range data {
@@ -315,7 +315,7 @@ func BenchmarkCalcSource_Exact(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		src, clkDiv, waitCycles, actual, err := calcSource(120*physic.KiloHertz, dmaWaitcyclesMax+1)
-		if src != clockSrc19dot2MHz || clkDiv != 160 || waitCycles != 1 || actual != 120*physic.KiloHertz || err != nil {
+		if src != clockSrcOscillator || clkDiv != 160 || waitCycles != 1 || actual != 120*physic.KiloHertz || err != nil {
 			b.Fatal(src, clkDiv, waitCycles, actual, err)
 		}
 	}
@@ -325,7 +325,7 @@ func BenchmarkCalcSource_Oversample(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		src, clkDiv, waitCycles, actual, err := calcSource(10*physic.Hertz, dmaWaitcyclesMax+1)
-		if src != clockSrc19dot2MHz || clkDiv != 4000 || waitCycles != 32 || actual != 150*physic.Hertz || err != nil {
+		if src != clockSrcOscillator || clkDiv != 4000 || waitCycles != 32 || actual != 150*physic.Hertz || err != nil {
 			b.Fatal(clkDiv, waitCycles, actual)
 		}
 	}
